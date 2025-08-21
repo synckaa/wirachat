@@ -49,7 +49,8 @@ func (h *Hub) Run() {
 		case m := <-h.Broadcast:
 			h.Mutex.Lock()
 			for client := range h.Clients {
-				err := client.WriteJSON(m)
+				jsonMsg, _ := json.Marshal(m)
+				err := client.WriteMessage(websocket.TextMessage, jsonMsg)
 				if err != nil {
 					_ = client.Close()
 					delete(h.Clients, client)
