@@ -10,34 +10,34 @@ import (
 	"github.com/rivo/tview"
 )
 
-var incoming chan Message
-var outgoing chan Message
+var incoming = make(chan Message)
+var outgoing = make(chan Message)
+var form *tview.Form
 
 func RunChat(url string) {
 	var app = tview.NewApplication()
 	nameInput := tview.NewInputField().SetLabel("Name :").SetFieldWidth(20)
-	Submit := func() {
-		userName := nameInput.GetText()
-		if userName == "" {
-			return
-		}
-		ShowChat(app, userName, url)
-
-	}
-	form := tview.NewForm().
+	form = tview.NewForm().
 		AddFormItem(nameInput).
-		AddButton("join", Submit).
+		AddButton("join", func() {
+			userName := nameInput.GetText()
+			if userName == "" {
+				modal := tview.NewModal().
+					SetText("Please input your name").
+					AddButtons([]string{"OK"}).
+					SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+						app.SetRoot(form, true)
+					})
+				app.SetRoot(modal, true)
+				return
+			}
+			ShowChat(app, userName, url)
+		}).
 		AddButton("quit", func() {
 			app.Stop()
 		})
 
 	form.SetBorder(true).SetTitle("Chat").SetTitleAlign(tview.AlignLeft)
-
-	nameInput.SetDoneFunc(func(key tcell.Key) {
-		if key == tcell.KeyEnter {
-			Submit()
-		}
-	})
 
 	if err := app.SetRoot(form, true).Run(); err != nil {
 		panic(err)
@@ -46,28 +46,24 @@ func RunChat(url string) {
 }
 
 func ShowChat(app *tview.Application, username string, url string) {
-	incoming = make(chan Message)
-	outgoing = make(chan Message)
-	chatLog := tview.NewTextView().
-		SetDynamicColors(true).
-		SetScrollable(true)
-	msgInput := tview.NewInputField().SetLabel("Enter Message :").SetFieldWidth(20)
-	flex := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(chatLog, 0, 1, false).AddItem(msgInput, 1, 1, true)
+	chatLog := tview.NewTextView().SetDynamicColors(true).SetScrollable(true)
+	clientInput := tview.NewInputField().SetLabel("Enter Message :").SetFieldWidth(20)
+	flex := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(chatLog, 0, 1, false).AddItem(clientInput, 1, 1, true)
 	flex.SetTitle("Chat").SetTitleAlign(tview.AlignLeft).SetBorder(true)
 	go ClientDial(app, chatLog, url)
-	msgInput.SetDoneFunc(func(key tcell.Key) {
+	clientInput.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
-			data := msgInput.GetText()
+			data := clientInput.GetText()
 			if data == "" {
 				return
 			}
-			Msg := Message{
+			clientMsg := Message{
 				Name: username,
 				Data: data,
 				Time: time.Now().Format("15:04"),
 			}
-			outgoing <- Msg
-			msgInput.SetText("")
+			outgoing <- clientMsg
+			clientInput.SetText("")
 		}
 	})
 
@@ -77,54 +73,67 @@ func ShowChat(app *tview.Application, username string, url string) {
 			app.SetFocus(chatLog)
 			return nil
 		case tcell.KeyEsc:
-			app.SetFocus(msgInput)
+			app.SetFocus(clientInput)
 		}
 		return event
 	})
 
-	if err := app.SetRoot(flex, true).Run(); err != nil {
-		panic(err)
-	}
+	app.SetRoot(flex, true)
 
 }
 
 func ClientDial(app *tview.Application, chatLog *tview.TextView, url string) {
-	Myurl := url
-	conn, _, err := websocket.DefaultDialer.Dial(Myurl, nil)
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		panic(err)
 	}
-	defer conn.Close()
+	defer func() {
+		err = conn.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
 
 	go func() {
 		for {
-			var Msg Message
+			var serverMsg Message
 			_, message, err := conn.ReadMessage()
 			if err != nil {
 				app.QueueUpdateDraw(func() {
-					fmt.Fprintln(chatLog, err)
+					_, err = fmt.Fprintln(chatLog, err)
+					if err != nil {
+						panic(err)
+					}
 				})
 				return
 			}
-			json.Unmarshal(message, &Msg)
-			incoming <- Msg
+			err = json.Unmarshal(message, &serverMsg)
+			if err != nil {
+				panic(err)
+			}
+			incoming <- serverMsg
 		}
 	}()
 
 	for {
 		select {
-		case Msg := <-outgoing:
-			msgJson, _ := json.Marshal(Msg)
-			err = conn.WriteMessage(websocket.TextMessage, msgJson)
+		case clientMsg := <-outgoing:
+			clientMsgJson, _ := json.Marshal(clientMsg)
+			err = conn.WriteMessage(websocket.TextMessage, clientMsgJson)
 			if err != nil {
 				app.QueueUpdateDraw(func() {
-					fmt.Fprintln(chatLog, err)
+					_, err = fmt.Fprintln(chatLog, err)
+					if err != nil {
+						panic(err)
+					}
 				})
 			}
-		case message := <-incoming:
-			Msg := message
+		case serverMsg := <-incoming:
 			app.QueueUpdateDraw(func() {
-				fmt.Fprintln(chatLog, Msg.Time, "[", Msg.Name, "] -->	", Msg.Data)
+				_, err = fmt.Fprintln(chatLog, serverMsg.Time, "[", serverMsg.Name, "] -->	", serverMsg.Data)
+				if err != nil {
+					panic(err)
+				}
 				chatLog.ScrollToEnd()
 			})
 		}
