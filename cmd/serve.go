@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// serveCmd represents the serve command
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "create a chatting server",
@@ -17,19 +16,19 @@ var serveCmd = &cobra.Command{
 }
 
 var MyPort string
-var MyPath string
+var MyEndpoint string
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().StringVarP(&MyPort, "port", "p", "8080", "port to serve on")
-	serveCmd.Flags().StringVarP(&MyPath, "path", "e", "/", "path to serve on")
+	serveCmd.Flags().StringVarP(&MyEndpoint, "endpoint", "e", "/", "path to serve on")
 
 }
 
 func RunServer() {
 	cfg := internal.Configuration{
 		Port: MyPort,
-		Path: MyPath,
+		Path: MyEndpoint,
 	}
 
 	internal.RunServeCommand(cfg)

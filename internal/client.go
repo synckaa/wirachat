@@ -16,7 +16,7 @@ var form *tview.Form
 
 func RunChat(url string) {
 	var app = tview.NewApplication()
-	nameInput := tview.NewInputField().SetLabel("Name :").SetFieldWidth(20)
+	nameInput := tview.NewInputField().SetLabel("Name :").SetFieldWidth(30).SetFieldBackgroundColor(tcell.ColorWhite)
 	form = tview.NewForm().
 		AddFormItem(nameInput).
 		AddButton("join", func() {
@@ -37,9 +37,13 @@ func RunChat(url string) {
 			app.Stop()
 		})
 
-	form.SetBorder(true).SetTitle("Chat").SetTitleAlign(tview.AlignLeft)
+	form.SetBorder(true).SetTitle("WIRAChat").SetTitleAlign(tview.AlignCenter)
+	form.SetFieldBackgroundColor(tcell.ColorBlack).SetButtonBackgroundColor(tcell.ColorBlack).SetButtonTextColor(tcell.ColorWhite)
+	grid := tview.NewGrid(). // atas, tengah, bawah (0 = fleksibel)
+					SetColumns(0, 0, 0).                  // kiri, tengah, kanan
+					AddItem(form, 0, 1, 1, 1, 0, 0, true) // taruh form di tengah
 
-	if err := app.SetRoot(form, true).Run(); err != nil {
+	if err := app.SetRoot(grid, true).Run(); err != nil {
 		panic(err)
 	}
 
@@ -47,7 +51,7 @@ func RunChat(url string) {
 
 func ShowChat(app *tview.Application, username string, url string) {
 	chatLog := tview.NewTextView().SetDynamicColors(true).SetScrollable(true)
-	clientInput := tview.NewInputField().SetLabel("Enter Message :").SetFieldWidth(20)
+	clientInput := tview.NewInputField().SetLabel("Enter Message :").SetFieldWidth(20).SetFieldBackgroundColor(tcell.ColorBlack)
 	flex := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(chatLog, 0, 1, false).AddItem(clientInput, 1, 1, true)
 	flex.SetTitle("Chat").SetTitleAlign(tview.AlignLeft).SetBorder(true)
 	go ClientDial(app, chatLog, url)

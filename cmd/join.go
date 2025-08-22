@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// joinCmd represents the join command
 var joinCmd = &cobra.Command{
 	Use:   "join",
 	Short: "join to chat server",
